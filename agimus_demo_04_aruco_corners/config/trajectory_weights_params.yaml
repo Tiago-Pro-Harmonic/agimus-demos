@@ -1,0 +1,32 @@
+---
+# Trajectory weights and publisher parameters for the ArUco corner pinpointing demo.
+aruco_corner_publisher:
+  ros__parameters:
+    # Joint-space tracking weights (broadcast to all 7 DOF if length 1)
+    w_q: [2.0]
+    w_qdot: [8.0]
+    w_qddot: [0.0]
+    w_robot_effort: [0.0012]
+
+    # End-effector position weights: [x, y, z, rx, ry, rz]
+    # Orientation weights set to 0: only position is tracked.
+    # Orientation is regulated naturally by the state regularization cost.
+    w_pose: [20.0, 20.0, 20.0, 0.0, 0.0, 0.0]
+
+    # Name of the end-effector frame in the Pinocchio model
+    ee_frame_name: gripper_right_fingertip_right_link
+
+    # ArUco marker geometry
+    marker_size: 0.176  # metres (17.6 cm), DICT_4X4_50
+
+    # Distance the EE hovers in front of each corner (along marker Z axis)
+    approach_z_offset: 0.02  # metres
+
+    # Time spent hovering at each corner before auto-advancing (seconds).
+    # Set to 0.0 to disable auto-advance and use only the ~/next_corner service.
+    dwell_time: 0.0
+
+    # Real-robot ArUco detection parameters (only used when use_aruco_detection:=true)
+    # ID of the ArUco marker to track (must match the printed marker)
+    target_marker_id: 0
+

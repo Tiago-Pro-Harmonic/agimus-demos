@@ -1,0 +1,65 @@
+---
+# OCP definition for the ArUco corner pinpointing demo.
+#
+# Identical structure to demo_04_visual_servoing, with two differences:
+#   - object_frame is "aruco_marker" (published as a static TF in simulation)
+#   - No collision avoidance cost (simplified setup)
+#
+# The ResidualModelVisualServoing cost computes:
+#   wMtarget = TF(fer_link0 → aruco_marker) * oMcorner
+# where oMcorner is the corner pose in the marker frame, published by the
+# aruco_corner_publisher node.
+running_model:
+  class: IntegratedActionModelEuler
+  differential:
+    class: DifferentialActionModelFreeFwdDynamics
+    costs:
+    - name: control_reg
+      update: true
+      weight: 1.0
+      cost:
+        class: CostModelResidual
+        activation:
+          class: ActivationModelWeightedQuad
+          weights: 1.0
+        residual:
+          class: ResidualModelControl
+    - name: state_reg
+      update: true
+      weight: 1.0
+      cost:
+        class: CostModelResidual
+        activation:
+          class: ActivationModelWeightedQuad
+          weights: 1.0
+        residual:
+          class: ResidualModelState
+    - name: goal_tracking
+      update: true
+      weight: 10.0
+      cost:
+        class: CostModelResidual
+        activation:
+          class: ActivationModelWeightedQuad
+          weights: 1.0
+        residual:
+          class: ResidualModelVisualServoing
+          world_frame: universe
+          robot_frame: gripper_right_fingertip_right_link
+          object_frame: aruco_marker
+
+terminal_model:
+  class: IntegratedActionModelEuler
+  differential:
+    class: DifferentialActionModelFreeFwdDynamics
+    costs:
+    - name: state_reg
+      update: true
+      weight: 1.0
+      cost:
+        class: CostModelResidual
+        activation:
+          class: ActivationModelWeightedQuad
+          weights: 1.0
+        residual:
+          class: ResidualModelState

@@ -1,0 +1,35 @@
+<?xml version="1.0"?>
+<sdf version="1.9">
+  <model name="aruco_marker_0">
+    <static>true</static>
+    <link name="link">
+
+      <visual name="visual">
+        <geometry>
+          <!-- 17.6 cm square, 2 mm thick. The marker face is on the +Z side. -->
+          <box>
+            <size>0.176 0.176 0.002</size>
+          </box>
+        </geometry>
+        <material>
+          <diffuse>1 1 1 1</diffuse>
+          <specular>0 0 0 1</specular>
+          <pbr>
+            <metal>
+              <albedo_map>model://aruco_marker_0/materials/textures/aruco_4x4_id0.png</albedo_map>
+            </metal>
+          </pbr>
+        </material>
+      </visual>
+
+      <collision name="collision">
+        <geometry>
+          <box>
+            <size>0.176 0.176 0.002</size>
+          </box>
+        </geometry>
+      </collision>
+
+    </link>
+  </model>
+</sdf>

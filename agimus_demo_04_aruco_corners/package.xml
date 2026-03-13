@@ -1,0 +1,31 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>agimus_demo_04_aruco_corners</name>
+  <version>0.0.0</version>
+  <description>
+    Demo that drives fer_hand_tcp to sequentially pinpoint the 4 corners of an
+    ArUco marker (DICT_4X4_50, 17.6 cm) using the Agimus MPC stack.
+    The marker pose is fixed via a static TF transform for simulation.
+  </description>
+  <maintainer email="todo@todo.com">TODO</maintainer>
+
+  <license>BSD-2</license>
+  <url type="website">https://www.agimus-project.eu/</url>
+  <url type="repository">https://github.com/agimus-project/agimus-demos</url>
+  <url type="bugtracker">https://github.com/agimus-project/agimus-demos/issues</url>
+
+  <buildtool_depend>ament_cmake_auto</buildtool_depend>
+
+  <exec_depend>agimus_demos_common</exec_depend>
+  <exec_depend>std_srvs</exec_depend>
+  <exec_depend>tf2_ros</exec_depend>
+  <exec_depend>ros2_aruco</exec_depend>
+  <exec_depend>ros2_aruco_interfaces</exec_depend>
+  <exec_depend>linear_feedback_controller</exec_depend>
+  <exec_depend>ros2launch</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
