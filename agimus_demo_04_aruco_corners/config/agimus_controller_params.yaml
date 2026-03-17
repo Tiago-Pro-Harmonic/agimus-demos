@@ -6,7 +6,7 @@ agimus_controller_node:
     rate: 50.0
     ocp:
       dt: 0.01
-      horizon_size: 10
+      horizon_size: 19
       dt_factor_n_seq:
         n_steps: [5, 5, 5, 4]
         factors: [1, 2, 4, 8]
