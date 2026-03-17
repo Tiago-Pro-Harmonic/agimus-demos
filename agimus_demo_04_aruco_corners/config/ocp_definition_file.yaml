@@ -44,8 +44,8 @@ running_model:
           weights: 1.0
         residual:
           class: ResidualModelVisualServoing
-          world_frame: universe
-          robot_frame: gripper_right_fingertip_right_link
+          world_frame: base_footprint
+          robot_frame: gripper_right_fingertip_left_link
           object_frame: aruco_marker
 
 terminal_model:

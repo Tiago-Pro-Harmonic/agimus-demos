@@ -1,26 +1,27 @@
 """
 ArucoCornerPublisher node.
 
-Drives fer_hand_tcp sequentially to hover 2 cm above each of the 4 corners of a
-fixed ArUco marker, then returns the robot to its neutral configuration.
+Drives gripper_right_fingertip_right_link sequentially to hover 2 cm in front of
+each of the 4 corners of an ArUco marker, then returns the robot to its home
+configuration.
 
-Corner ordering follows the OpenCV ArUco convention in the marker frame
-(X right, Y up, Z pointing out toward the camera/robot):
+The aruco_marker frame follows the standard OpenCV ArUco convention:
+    X: to the right of the marker face (as seen from the robot)
+    Y: upward on the marker face
+    Z: pointing toward the robot (out of the marker face, approach direction)
+
+Corner positions in the marker frame (h = marker_size / 2):
     Corner 0  top-left:     [-h,  h, z_off]
     Corner 1  top-right:    [ h,  h, z_off]
     Corner 2  bottom-right: [ h, -h, z_off]
     Corner 3  bottom-left:  [-h, -h, z_off]
 
-The node uses the ResidualModelVisualServoing interface: it publishes the corner
-pose in the ArUco marker frame as the MpcInput EE target. The MPC controller reads
-the TF "fer_link0 → aruco_marker" and computes the world-frame target at each solve
-step:
-    wMtarget = TF(fer_link0 → aruco_marker) * oMcorner
+This convention is consistent between the two modes:
+  use_aruco_detection:=true   — aruco_marker TF published by aruco_node (OpenCV)
+  use_aruco_detection:=false  — static TF with roll=π/2, pitch=0, yaw=-π/2
 
-In simulation the TF is provided by a static_transform_publisher in the launch file.
-On the real robot (use_aruco_detection:=true), this node subscribes to /aruco_markers
-published by the ros2_aruco node and broadcasts the TF dynamically from detections,
-latching the last known pose when the marker is temporarily out of view.
+The MPC controller reads the TF base_footprint → aruco_marker and computes:
+    wMtarget = TF(base_footprint → aruco_marker) * oMcorner
 """
 
 import enum
@@ -45,10 +46,10 @@ from agimus_controller_ros.ros_utils import (
 from agimus_controller_ros.simple_trajectory_publisher import TrajectoryPublisherBase
 from agimus_controller_ros.trajectory_weights_parameters import trajectory_weights_params
 
-# Franka Panda "ready" configuration (7 revolute joints).
+# TIAGo Pro right arm "home" configuration (arm_right_1 … arm_right_7).
 # The robot returns here after visiting all 4 corners.
-FRANKA_NEUTRAL_Q = np.array(
-    [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+TIAGO_PRO_HOME_Q = np.array(
+    [-0.36, -1.83, -0.47, -2.35, 0.0, -1.2, 0.0]
 )
 
 
@@ -73,9 +74,9 @@ class ArucoCornerPublisher(TrajectoryPublisherBase):
 
     State machine: CORNER_0 → CORNER_1 → CORNER_2 → CORNER_3 → NEUTRAL → DONE
 
-    Each CORNER_i phase publishes MpcInput messages that drive fer_hand_tcp to hover
-    above corner i.  After `dwell_time` seconds the state advances to the next corner.
-    The NEUTRAL phase publishes messages with zero EE cost and q_ref = FRANKA_NEUTRAL_Q,
+    Each CORNER_i phase publishes MpcInput messages that drive the EE to hover in
+    front of corner i.  After `dwell_time` seconds the state advances to the next corner.
+    The NEUTRAL phase publishes messages with zero EE cost and q_ref = TIAGO_PRO_HOME_Q,
     letting the state regularisation cost bring the robot back to rest.
     """
 
@@ -148,8 +149,8 @@ class ArucoCornerPublisher(TrajectoryPublisherBase):
         model = self.robot_models.robot_model
         nv = model.nv
 
-        assert nv == len(FRANKA_NEUTRAL_Q), (
-            f"FRANKA_NEUTRAL_Q has {len(FRANKA_NEUTRAL_Q)} joints but model has {nv}."
+        assert nv == len(TIAGO_PRO_HOME_Q), (
+            f"TIAGO_PRO_HOME_Q has {len(TIAGO_PRO_HOME_Q)} joints but model has {nv}."
         )
 
         # Weight vectors broadcast to the model dimension when needed
@@ -189,10 +190,10 @@ class ArucoCornerPublisher(TrajectoryPublisherBase):
 
         # ----- Neutral trajectory point -----
         # EE cost is zeroed out; state regularisation drives the robot to
-        # FRANKA_NEUTRAL_Q. We must still provide the vs_key in end_effector_poses
+        # TIAGO_PRO_HOME_Q. We must still provide the vs_key in end_effector_poses
         # because ResidualModelVisualServoing asserts exactly one EE entry exists.
         # With all-zero weights the transform lookup is skipped and the cost is zero.
-        q_neutral = FRANKA_NEUTRAL_Q.copy()
+        q_neutral = TIAGO_PRO_HOME_Q.copy()
         data_neutral = model.createData()
         tau_neutral = pinocchio.rnea(
             model, data_neutral, q_neutral, np.zeros(nv), np.zeros(nv)
@@ -315,7 +316,7 @@ class ArucoCornerPublisher(TrajectoryPublisherBase):
             self._advance_phase()
 
         if self._phase in (Phase.NEUTRAL, Phase.DONE):
-            # Do NOT update robot_configuration: keep it at FRANKA_NEUTRAL_Q so
+            # Do NOT update robot_configuration: keep it at TIAGO_PRO_HOME_Q so
             # the state regularisation cost pulls toward the rest pose.
             pt = self._neutral_point
         else:

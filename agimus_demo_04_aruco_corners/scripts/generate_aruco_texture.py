@@ -31,7 +31,11 @@ IMAGE_SIZE = 512  # pixels - large enough for clean rendering
 
 def main():
     aruco_dict = cv2.aruco.getPredefinedDictionary(DICT_ID)
-    marker_img = cv2.aruco.generateImageMarker(aruco_dict, MARKER_ID, IMAGE_SIZE, borderBits=1)
+    # generateImageMarker added in OpenCV 4.7; use drawMarker for older versions (Ubuntu Noble = 4.6)
+    if hasattr(cv2.aruco, "generateImageMarker"):
+        marker_img = cv2.aruco.generateImageMarker(aruco_dict, MARKER_ID, IMAGE_SIZE, borderBits=1)
+    else:
+        marker_img = cv2.aruco.drawMarker(aruco_dict, MARKER_ID, IMAGE_SIZE)
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
     output_dir = os.path.join(

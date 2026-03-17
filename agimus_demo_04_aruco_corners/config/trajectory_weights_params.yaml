@@ -14,7 +14,7 @@ aruco_corner_publisher:
     w_pose: [20.0, 20.0, 20.0, 0.0, 0.0, 0.0]
 
     # Name of the end-effector frame in the Pinocchio model
-    ee_frame_name: gripper_right_fingertip_right_link
+    ee_frame_name: gripper_right_fingertip_left_link
 
     # ArUco marker geometry
     marker_size: 0.176  # metres (17.6 cm), DICT_4X4_50
