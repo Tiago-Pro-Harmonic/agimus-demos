@@ -75,6 +75,7 @@ def launch_setup(
         ),
         launch_arguments={
             "use_gazebo": LaunchConfiguration("use_gazebo"),
+            "gzclient": LaunchConfiguration("gzclient"),
         }.items(),
     )
 
@@ -293,6 +294,12 @@ def generate_launch_description():
                 default_value="true",
                 choices=["true", "false"],
                 description="Launch with Gazebo simulation.",
+            ),
+            DeclareLaunchArgument(
+                "gzclient",
+                default_value="True",
+                choices=["True", "False"],
+                description="Launch Gazebo GUI client.",
             ),
             DeclareLaunchArgument(
                 "use_aruco_detection",

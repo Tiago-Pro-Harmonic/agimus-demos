@@ -90,7 +90,7 @@ class ArucoCornerPublisher(TrajectoryPublisherBase):
 
         # Custom parameters — declared explicitly (not part of shared schema)
         self.declare_parameter("marker_size", 0.176)
-        self.declare_parameter("approach_z_offset", 0.02)
+        self.declare_parameter("approach_z_offset", -0.5)
         self.declare_parameter("dwell_time", 5.0)
         # Real-robot ArUco detection parameters
         self.declare_parameter("use_aruco_detection", False)

@@ -20,7 +20,7 @@ aruco_corner_publisher:
     marker_size: 0.176  # metres (17.6 cm), DICT_4X4_50
 
     # Distance the EE hovers in front of each corner (along marker Z axis)
-    approach_z_offset: 0.02  # metres
+    approach_z_offset: 0.1  # metres
 
     # Time spent hovering at each corner before auto-advancing (seconds).
     # Set to 0.0 to disable auto-advance and use only the ~/next_corner service.
