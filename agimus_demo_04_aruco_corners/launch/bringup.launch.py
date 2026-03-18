@@ -1,33 +1,37 @@
 """
-Bringup launch file for the ArUco corner pinpointing demo.
+Bringup launch file for the ArUco corner pinpointing demo (TIAGo Pro real robot).
 
-Starts the Franka robot (simulation or hardware), the Agimus MPC controller, and
-the ArUco corner publisher node.  The ArUco marker pose is fixed via a static TF
-transform (fer_link0 → aruco_marker), configurable through launch arguments.
+Connects to the real TIAGo Pro with the Linear Feedback Controller, launches the
+Agimus MPC controller and the ArUco corner publisher node.
 
-Usage (simulation):
+Two modes for the aruco_marker TF:
+  use_aruco_detection:=true  (default)
+      Live detection from the head camera via aruco_node. The marker pose
+      updates continuously — may be noisy depending on lighting and distance.
+  use_aruco_detection:=false
+      Static TF fixed at the given marker position (base_footprint → aruco_marker).
+      Stable, no perception noise.
+
+Usage:
+    ros2 launch agimus_demo_04_aruco_corners bringup.launch.py
     ros2 launch agimus_demo_04_aruco_corners bringup.launch.py \\
-        use_gazebo:=true use_rviz:=true \\
-        marker_x:=0.5 marker_y:=0.0 marker_z:=0.3 marker_pitch:=3.14159
-
-The default marker pose places the marker roughly in front of the Franka arm,
-facing the robot (Z axis pointing toward it).
+        use_aruco_detection:=false marker_x:=0.6 marker_z:=1.2
 """
 
+import math
+
 from launch import LaunchContext, LaunchDescription
-from launch.actions import DeclareLaunchArgument, OpaqueFunction, RegisterEventHandler
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction, RegisterEventHandler
 from launch.conditions import IfCondition, UnlessCondition
 from launch.event_handlers import OnProcessExit
 from launch.launch_description_entity import LaunchDescriptionEntity
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, Command, FindExecutable
 from launch_ros.actions import Node
+from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 
-from agimus_demos_common.launch_utils import (
-    generate_default_franka_args,
-    generate_include_launch,
-    get_use_sim_time,
-)
+from agimus_demos_common.launch_utils import get_use_sim_time
 from agimus_demos_common.mpc_debugger_node import mpc_debugger_node
 
 
@@ -38,29 +42,32 @@ def launch_setup(
     use_aruco_detection = LaunchConfiguration("use_aruco_detection")
 
     # ------------------------------------------------------------------ #
-    # Franka robot (simulation or hardware) with Linear Feedback Controller
+    # TIAGo Pro real robot with Linear Feedback Controller
     # ------------------------------------------------------------------ #
-    franka_robot_launch = generate_include_launch("franka_common_lfc.launch.py")
-
-    # ------------------------------------------------------------------ #
-    # Synchronisation: wait until the robot has non-zero joint positions
-    # ------------------------------------------------------------------ #
-    wait_for_non_zero_joints_node = Node(
-        package="agimus_demos_common",
-        executable="wait_for_non_zero_joints_node",
-        parameters=[get_use_sim_time()],
-        output="screen",
+    tiago_robot_launch = IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(
+            PathJoinSubstitution(
+                [
+                    FindPackageShare("tiago_pro_lfc_bringup"),
+                    "launch",
+                    "tiago_pro_common.launch.py",
+                ]
+            )
+        ),
+        launch_arguments={
+            "use_gazebo": "false",
+        }.items(),
     )
 
     # ------------------------------------------------------------------ #
-    # Static TF: simulated ArUco marker pose (fer_link0 → aruco_marker)
-    # Only used in simulation; on the real robot the TF comes from ArUco detection.
+    # Static TF: ArUco marker pose (base_footprint → aruco_marker)
+    # Used when use_aruco_detection:=false.
     # ------------------------------------------------------------------ #
-    aruco_marker_tf_node = Node(
+    static_aruco_tf_node = Node(
         package="tf2_ros",
         executable="static_transform_publisher",
         arguments=[
-            "--frame-id", "fer_link0",
+            "--frame-id", "base_footprint",
             "--child-frame-id", "aruco_marker",
             "--x", LaunchConfiguration("marker_x"),
             "--y", LaunchConfiguration("marker_y"),
@@ -74,10 +81,7 @@ def launch_setup(
     )
 
     # ------------------------------------------------------------------ #
-    # ArUco detection node (real robot only)
-    # Detects markers from the wrist-mounted RealSense D435.
-    # Publishes /aruco_markers with poses in camera_color_optical_frame.
-    # aruco_corner_publisher subscribes and re-broadcasts as TF.
+    # ArUco detection node (live detection from head camera)
     # ------------------------------------------------------------------ #
     aruco_node = Node(
         package="ros2_aruco",
@@ -87,8 +91,8 @@ def launch_setup(
             {
                 "marker_size": 0.176,
                 "aruco_dictionary_id": "DICT_4X4_50",
-                "image_topic": "/camera/camera/color/image_raw",
-                "camera_info_topic": "/camera/camera/color/camera_info",
+                "image_topic": "/head_front_camera/image",
+                "camera_info_topic": "/head_front_camera/camera_info",
             }
         ],
         condition=IfCondition(use_aruco_detection),
@@ -96,8 +100,17 @@ def launch_setup(
     )
 
     # ------------------------------------------------------------------ #
-    # Environment description (empty URDF — no collision objects in this demo)
-    # The MPC controller requires this topic to initialize the robot model.
+    # Synchronisation: wait until the robot has non-zero joint positions
+    # ------------------------------------------------------------------ #
+    wait_for_non_zero_joints_node = Node(
+        package="agimus_demos_common",
+        executable="wait_for_non_zero_joints_node",
+        parameters=[get_use_sim_time()],
+        output="screen",
+    )
+
+    # ------------------------------------------------------------------ #
+    # Environment description (empty — no collision objects in this demo)
     # ------------------------------------------------------------------ #
     environment_publisher_node = Node(
         package="agimus_demos_common",
@@ -111,44 +124,72 @@ def launch_setup(
         ],
     )
 
+    robot_srdf_publisher_node = Node(
+        package="agimus_demos_common",
+        executable="string_publisher",
+        name="robot_srdf_description_publisher",
+        output="screen",
+        parameters=[
+            {
+                "topic_name": "robot_srdf_description",
+                "string_value": ParameterValue(
+                    Command(
+                        [
+                            PathJoinSubstitution([FindExecutable(name="xacro")]),
+                            " ",
+                            PathJoinSubstitution(
+                                [
+                                    FindPackageShare("agimus_demos_common"),
+                                    "config",
+                                    "tiago_pro",
+                                    "tiago_pro_dummy.srdf.xacro",
+                                ]
+                            ),
+                        ]
+                    ),
+                    value_type=str,
+                ),
+            }
+        ],
+    )
+
     # ------------------------------------------------------------------ #
     # MPC controller
     # ------------------------------------------------------------------ #
-    agimus_controller_yaml = PathJoinSubstitution(
-        [
-            FindPackageShare("agimus_demo_04_aruco_corners"),
-            "config",
-            "agimus_controller_params.yaml",
-        ]
-    )
     agimus_controller_node = Node(
         package="agimus_controller_ros",
         executable="agimus_controller_node",
-        parameters=[get_use_sim_time(), agimus_controller_yaml],
-        remappings=[("robot_description", "robot_description_with_collision")],
+        parameters=[
+            get_use_sim_time(),
+            PathJoinSubstitution(
+                [
+                    FindPackageShare("agimus_demo_04_aruco_corners"),
+                    "config",
+                    "agimus_controller_params.yaml",
+                ]
+            ),
+        ],
         output="screen",
     )
 
     # ------------------------------------------------------------------ #
     # ArUco corner publisher
     # ------------------------------------------------------------------ #
-    trajectory_weights_yaml = PathJoinSubstitution(
-        [
-            FindPackageShare("agimus_demo_04_aruco_corners"),
-            "config",
-            "trajectory_weights_params.yaml",
-        ]
-    )
     aruco_corner_publisher_node = Node(
         package="agimus_demo_04_aruco_corners",
         executable="aruco_corner_publisher",
         name="aruco_corner_publisher",
         parameters=[
             get_use_sim_time(),
-            trajectory_weights_yaml,
+            PathJoinSubstitution(
+                [
+                    FindPackageShare("agimus_demo_04_aruco_corners"),
+                    "config",
+                    "trajectory_weights_params.yaml",
+                ]
+            ),
             {"use_aruco_detection": use_aruco_detection},
         ],
-        remappings=[("robot_description", "robot_description_with_collision")],
         output="screen",
     )
 
@@ -156,29 +197,28 @@ def launch_setup(
     # Optional MPC debugger (visualises predicted trajectory in RViz)
     # ------------------------------------------------------------------ #
     mpc_debugger = mpc_debugger_node(
-        "fer_hand_tcp",
-        parent_frame="fer_link0",
+        "gripper_right_fingertip_right_link",
+        parent_frame="base_footprint",
         cost_plot=True,
-        node_kwargs=dict(
-            remappings=[("robot_description", "robot_description_with_collision")],
-            condition=IfCondition(use_mpc_debugger),
-        ),
+        node_kwargs=dict(condition=IfCondition(use_mpc_debugger)),
     )
 
     # ------------------------------------------------------------------ #
-    # Launch sequence: start controller and publisher after robot is ready
+    # Launch sequence: start aruco detection immediately, then wait for
+    # robot joints before starting the MPC controller and corner publisher.
     # ------------------------------------------------------------------ #
     return [
-        franka_robot_launch,
-        wait_for_non_zero_joints_node,
-        aruco_marker_tf_node,
+        tiago_robot_launch,
+        static_aruco_tf_node,
         aruco_node,
+        wait_for_non_zero_joints_node,
         environment_publisher_node,
         mpc_debugger,
         RegisterEventHandler(
             event_handler=OnProcessExit(
                 target_action=wait_for_non_zero_joints_node,
                 on_exit=[
+                    robot_srdf_publisher_node,
                     agimus_controller_node,
                     aruco_corner_publisher_node,
                 ],
@@ -188,62 +228,47 @@ def launch_setup(
 
 
 def generate_launch_description():
-    import math
-
-    declared_arguments = [
-        DeclareLaunchArgument(
-            "use_mpc_debugger",
-            default_value="false",
-            description="Launch the mpc_debugger_node for RViz prediction visualisation.",
-            choices=["true", "false"],
-        ),
-        DeclareLaunchArgument(
-            "use_aruco_detection",
-            default_value="false",
-            description=(
-                "Use live ArUco detection from the wrist D435 camera (real robot). "
-                "When false a static TF is used instead (simulation)."
-            ),
-            choices=["true", "false"],
-        ),
-        # Marker position in the fer_link0 frame
-        DeclareLaunchArgument(
-            "marker_x",
-            default_value="0.5",
-            description="X position of the ArUco marker in fer_link0 frame (m).",
-        ),
-        DeclareLaunchArgument(
-            "marker_y",
-            default_value="0.0",
-            description="Y position of the ArUco marker in fer_link0 frame (m).",
-        ),
-        DeclareLaunchArgument(
-            "marker_z",
-            default_value="0.3",
-            description="Z position of the ArUco marker in fer_link0 frame (m).",
-        ),
-        # Marker orientation: default pitch=pi rotates the marker so its Z axis
-        # points back toward the robot (i.e. the marker is facing the robot).
-        DeclareLaunchArgument(
-            "marker_roll",
-            default_value="0.0",
-            description="Roll of the ArUco marker in fer_link0 frame (rad).",
-        ),
-        DeclareLaunchArgument(
-            "marker_pitch",
-            default_value=str(math.pi),
-            description="Pitch of the ArUco marker in fer_link0 frame (rad). "
-                        "Default pi: marker Z axis pointing toward the robot.",
-        ),
-        DeclareLaunchArgument(
-            "marker_yaw",
-            default_value="0.0",
-            description="Yaw of the ArUco marker in fer_link0 frame (rad).",
-        ),
-    ]
-
     return LaunchDescription(
-        declared_arguments
-        + generate_default_franka_args()
-        + [OpaqueFunction(function=launch_setup)]
+        [
+            DeclareLaunchArgument(
+                "use_mpc_debugger",
+                default_value="false",
+                choices=["true", "false"],
+                description="Launch the mpc_debugger_node for RViz prediction visualisation.",
+            ),
+            DeclareLaunchArgument(
+                "use_aruco_detection",
+                default_value="true",
+                choices=["true", "false"],
+                description=(
+                    "true: live ArUco detection from head camera (default for real robot). "
+                    "false: static TF fixed at given marker coordinates."
+                ),
+            ),
+            DeclareLaunchArgument(
+                "marker_x", default_value="0.6",
+                description="X position of the ArUco marker in base_footprint frame (m).",
+            ),
+            DeclareLaunchArgument(
+                "marker_y", default_value="0.0",
+                description="Y position of the ArUco marker in base_footprint frame (m).",
+            ),
+            DeclareLaunchArgument(
+                "marker_z", default_value="1.2",
+                description="Z position of the ArUco marker in base_footprint frame (m).",
+            ),
+            DeclareLaunchArgument(
+                "marker_roll", default_value=str(math.pi / 2),
+                description="Roll of the ArUco marker in base_footprint frame (rad).",
+            ),
+            DeclareLaunchArgument(
+                "marker_pitch", default_value="0.0",
+                description="Pitch of the ArUco marker in base_footprint frame (rad).",
+            ),
+            DeclareLaunchArgument(
+                "marker_yaw", default_value=str(-math.pi / 2),
+                description="Yaw of the ArUco marker in base_footprint frame (rad).",
+            ),
+            OpaqueFunction(function=launch_setup),
+        ]
     )
