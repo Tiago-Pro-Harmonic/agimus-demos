@@ -102,9 +102,13 @@ class ArucoCornerPublisher(TrajectoryPublisherBase):
         self._use_aruco_detection = self.get_parameter("use_aruco_detection").value
         self._target_marker_id = self.get_parameter("target_marker_id").value
 
-        # Fetch the MPC timestep from agimus_controller_node
-        params = get_params_from_node(self, "agimus_controller_node", ["ocp.dt"])
+        # Fetch the MPC timestep and rate from agimus_controller_node.
+        # The publisher timer runs at the MPC rate (not 1/dt) so that the buffer
+        # does not accumulate faster than the MPC consumes it, which would cause
+        # large latency when changing corners.
+        params = get_params_from_node(self, "agimus_controller_node", ["ocp.dt", "rate"])
         self._dt = params[0].double_value
+        self._publish_period = 1.0 / params[1].double_value
 
         # Visual servoing key: must match ResidualModelVisualServoing.input_key
         # which is built as robot_frame + "_vs" in ocp_croco_generic.py.
@@ -229,7 +233,7 @@ class ArucoCornerPublisher(TrajectoryPublisherBase):
         self._next_corner_srv = self.create_service(
             Trigger, "~/next_corner", self._next_corner_callback
         )
-        self.timer = self.create_timer(self._dt, self.publish_reference)
+        self.timer = self.create_timer(self._publish_period, self.publish_reference)
         self.get_logger().info(
             f"ArucoCornerPublisher ready.  "
             f"Will visit 4 corners ({self._dwell_time:.1f} s each, or call "
@@ -311,7 +315,7 @@ class ArucoCornerPublisher(TrajectoryPublisherBase):
             self.publisher_.publish(weighted_traj_point_to_mpc_msg(self._neutral_point))
             return
 
-        self._phase_elapsed += self._dt
+        self._phase_elapsed += self._publish_period
         if self._dwell_time > 0 and self._phase_elapsed >= self._dwell_time:
             self._advance_phase()
 

@@ -3,7 +3,7 @@
 # Based on demo_04_visual_servoing params, with collision avoidance removed.
 agimus_controller_node:
   ros__parameters:
-    rate: 50.0
+    rate: 100.0
     ocp:
       dt: 0.01
       horizon_size: 19
