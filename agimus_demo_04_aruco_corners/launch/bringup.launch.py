@@ -21,17 +21,19 @@ Usage:
 import math
 
 from launch import LaunchContext, LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction, RegisterEventHandler
+from launch.actions import DeclareLaunchArgument, OpaqueFunction, RegisterEventHandler
 from launch.conditions import IfCondition, UnlessCondition
 from launch.event_handlers import OnProcessExit
 from launch.launch_description_entity import LaunchDescriptionEntity
-from launch.substitutions import LaunchConfiguration, PathJoinSubstitution, Command, FindExecutable
+from launch.substitutions import LaunchConfiguration, PathJoinSubstitution
 from launch_ros.actions import Node
-from launch_ros.parameter_descriptions import ParameterValue
 from launch_ros.substitutions import FindPackageShare
-from launch.launch_description_sources import PythonLaunchDescriptionSource
 
-from agimus_demos_common.launch_utils import get_use_sim_time
+from agimus_demos_common.launch_utils import (
+    generate_default_tiago_pro_args,
+    generate_include_launch,
+    get_use_sim_time,
+)
 from agimus_demos_common.mpc_debugger_node import mpc_debugger_node
 
 
@@ -42,21 +44,11 @@ def launch_setup(
     use_aruco_detection = LaunchConfiguration("use_aruco_detection")
 
     # ------------------------------------------------------------------ #
-    # TIAGo Pro real robot with Linear Feedback Controller
+    # TIAGo Pro with Linear Feedback Controller
     # ------------------------------------------------------------------ #
-    tiago_robot_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource(
-            PathJoinSubstitution(
-                [
-                    FindPackageShare("tiago_pro_lfc_bringup"),
-                    "launch",
-                    "tiago_pro_common.launch.py",
-                ]
-            )
-        ),
-        launch_arguments={
-            "use_gazebo": "false",
-        }.items(),
+    tiago_robot_launch = generate_include_launch(
+        "tiago_pro_common.launch.py",
+        extra_launch_arguments={"tuck_arm": "False"},
     )
 
     # ------------------------------------------------------------------ #
@@ -124,35 +116,6 @@ def launch_setup(
         ],
     )
 
-    robot_srdf_publisher_node = Node(
-        package="agimus_demos_common",
-        executable="string_publisher",
-        name="robot_srdf_description_publisher",
-        output="screen",
-        parameters=[
-            {
-                "topic_name": "robot_srdf_description",
-                "string_value": ParameterValue(
-                    Command(
-                        [
-                            PathJoinSubstitution([FindExecutable(name="xacro")]),
-                            " ",
-                            PathJoinSubstitution(
-                                [
-                                    FindPackageShare("agimus_demos_common"),
-                                    "config",
-                                    "tiago_pro",
-                                    "tiago_pro_dummy.srdf.xacro",
-                                ]
-                            ),
-                        ]
-                    ),
-                    value_type=str,
-                ),
-            }
-        ],
-    )
-
     # ------------------------------------------------------------------ #
     # MPC controller
     # ------------------------------------------------------------------ #
@@ -168,6 +131,9 @@ def launch_setup(
                     "agimus_controller_params.yaml",
                 ]
             ),
+        ],
+        remappings=[
+            ("robot_description_semantic", "robot_srdf_description"),
         ],
         output="screen",
     )
@@ -200,7 +166,12 @@ def launch_setup(
         "gripper_right_fingertip_right_link",
         parent_frame="base_footprint",
         cost_plot=True,
-        node_kwargs=dict(condition=IfCondition(use_mpc_debugger)),
+        node_kwargs=dict(
+            remappings=[
+                ("robot_description_semantic", "robot_srdf_description"),
+            ],
+            condition=IfCondition(use_mpc_debugger),
+        ),
     )
 
     # ------------------------------------------------------------------ #
@@ -218,7 +189,6 @@ def launch_setup(
             event_handler=OnProcessExit(
                 target_action=wait_for_non_zero_joints_node,
                 on_exit=[
-                    robot_srdf_publisher_node,
                     agimus_controller_node,
                     aruco_corner_publisher_node,
                 ],
@@ -229,7 +199,8 @@ def launch_setup(
 
 def generate_launch_description():
     return LaunchDescription(
-        [
+        generate_default_tiago_pro_args()
+        + [
             DeclareLaunchArgument(
                 "use_mpc_debugger",
                 default_value="false",
