@@ -1,0 +1,65 @@
+---
+# OCP definition for the TIAGo Pro planar-base fixed-goal demo.
+#
+# The ResidualModelVisualServoing cost drives the right-arm EE to the target
+# pose published by fixed_goal_publisher via the <ee_frame>_vs trajectory key.
+#
+# world_frame must be a frame attached to joint 0 (universe) with identity
+# placement in the pinocchio model.
+# With JointModelPlanar, base_footprint/base_link are children of the planar
+# joint (joint 1), so the only valid choice is 'universe'.
+
+running_model:
+  class: IntegratedActionModelEuler
+  differential:
+    class: DifferentialActionModelFreeFwdDynamics
+    costs:
+    - name: control_reg
+      update: true
+      weight: 1.0
+      cost:
+        class: CostModelResidual
+        activation:
+          class: ActivationModelWeightedQuad
+          weights: 1.0
+        residual:
+          class: ResidualModelControl
+    - name: state_reg
+      update: true
+      weight: 1.0
+      cost:
+        class: CostModelResidual
+        activation:
+          class: ActivationModelWeightedQuad
+          weights: 1.0
+        residual:
+          class: ResidualModelState
+    - name: goal_tracking
+      update: true
+      weight: 10.0
+      cost:
+        class: CostModelResidual
+        activation:
+          class: ActivationModelWeightedQuad
+          weights: 1.0
+        residual:
+          class: ResidualModelVisualServoing
+          world_frame: universe
+          robot_frame: gripper_right_fingertip_left_link
+          object_frame: ee_target
+
+terminal_model:
+  class: IntegratedActionModelEuler
+  differential:
+    class: DifferentialActionModelFreeFwdDynamics
+    costs:
+    - name: state_reg
+      update: true
+      weight: 1.0
+      cost:
+        class: CostModelResidual
+        activation:
+          class: ActivationModelWeightedQuad
+          weights: 1.0
+        residual:
+          class: ResidualModelState

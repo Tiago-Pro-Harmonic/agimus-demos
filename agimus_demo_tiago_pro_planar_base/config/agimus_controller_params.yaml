@@ -1,0 +1,49 @@
+---
+# MPC parameters for the TIAGo Pro planar-base demo.
+#
+# TODO (infrastructure): The parameter `planar_base` does not yet exist in
+# agimus_controller. The following changes are required before enabling it:
+#
+#   1. agimus_controller/factory/robot_model.py
+#      Add JointModelPlanar() support alongside JointModelFreeFlyer().
+#
+#   2. agimus_controller/ocp_base_croco.py
+#      Replace ActuationModelFull with a mixed actuation model:
+#        - Base (3 DoF planar): velocity-controlled
+#        - Arm (7 DoF): torque-controlled
+#      → nu = 3 (base vel) + 7 (arm torques) = 10
+#
+#   3. agimus_controller_parameters.yaml
+#      Add `planar_base: bool` parameter.
+#
+#   4. LFC: no changes needed — continues to handle arm torques only.
+#      A separate base_cmd_bridge node extracts base velocity from /control
+#      and publishes it to /mobile_base_controller/cmd_vel.
+#
+# State space (once planar_base is implemented):
+#   nq = 4 (x, y, cos(yaw), sin(yaw)) + 7 (arm) = 11
+#   nv = 3 (vx, vy, omega)            + 7 (arm) = 10
+
+agimus_controller_node:
+  ros__parameters:
+    rate: 100.0
+    planar_base: true
+    ocp:
+      dt: 0.01
+      horizon_size: 19
+      dt_factor_n_seq:
+        n_steps: [5, 5, 5, 4]
+        factors: [1, 2, 4, 8]
+      # nv = 10: 3 base (x, y, yaw) + 7 arm joints
+      # base armature = 0 (no motor inertia model for base velocity control)
+      armature: [0.0, 0.0, 0.0, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
+      max_qp_iter: 50
+      max_iter: 5
+      activate_callback: false
+      effector_frame_name: gripper_right_fingertip_left_link
+      definition_yaml_file: package://agimus_demo_tiago_pro_planar_base/config/ocp_definition_file.yaml
+    robot_attachment_frame: universe
+    collision_pairs_names: [cp_1]
+    cp_1:
+      first: arm_right_7_link_0
+      second: arm_left_7_link_0

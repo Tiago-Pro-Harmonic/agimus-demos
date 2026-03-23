@@ -1,0 +1,33 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>agimus_demo_tiago_pro_planar_base</name>
+  <version>0.0.0</version>
+  <description>
+    Testbed for TIAGo Pro whole-body MPC with a planar mobile base.
+    The robot base is modelled as a 3-DoF planar joint (x, y, yaw) and the
+    right arm as 7 actuated joints. The MPC uses a mixed actuation model:
+    velocity commands for the base, torque control for the arm.
+
+    This package contains demos that progressively test the planar-base
+    infrastructure:
+      - fixed_goal: drive the right-arm end-effector to a fixed Cartesian target
+        while the base is free to move.
+  </description>
+  <maintainer email="todo@todo.com">TODO</maintainer>
+
+  <license>BSD-2</license>
+  <url type="website">https://www.agimus-project.eu/</url>
+  <url type="repository">https://github.com/agimus-project/agimus-demos</url>
+  <url type="bugtracker">https://github.com/agimus-project/agimus-demos/issues</url>
+
+  <buildtool_depend>ament_cmake_auto</buildtool_depend>
+
+  <exec_depend>agimus_demos_common</exec_depend>
+  <exec_depend>linear_feedback_controller</exec_depend>
+  <exec_depend>ros2launch</exec_depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>

@@ -1,0 +1,30 @@
+---
+# Trajectory weights for the fixed_goal_publisher node.
+#
+# Weight vectors of length 1 are broadcast to all DoF at runtime.
+# Once planar_base is enabled (nv=10), these will expand to 10 dimensions.
+# Weights can also be specified as explicit 10-element lists.
+
+fixed_goal_publisher:
+  ros__parameters:
+    # End-effector frame to track (must match ocp_definition_file.yaml robot_frame)
+    ee_frame_name: gripper_right_fingertip_left_link
+
+    # Joint-space regularisation weights (nv=10: 3 base + 7 arm)
+    w_q: [1.0]
+    w_qdot: [5.0]
+    w_qddot: [0.0]
+    # Effort weights: higher on base (3 DoF) to limit base velocity commands
+    w_robot_effort: [1.0, 1.0, 10.0, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001]
+
+    # EE pose tracking weights: [wx, wy, wz, wroll, wpitch, wyaw]
+    # Orientation weights set to 0: only position is tracked.
+    w_pose: [20.0, 20.0, 20.0, 0.0, 0.0, 0.0]
+
+    # Fixed Cartesian target for the EE (in universe / world frame)
+    goal_x: 2.0
+    goal_y: 0.2
+    goal_z: 1.0
+    goal_roll: 0.0
+    goal_pitch: 0.0
+    goal_yaw: 0.0
