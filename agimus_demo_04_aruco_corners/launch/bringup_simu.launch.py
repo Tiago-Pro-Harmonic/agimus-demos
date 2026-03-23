@@ -61,7 +61,7 @@ def launch_setup(
     use_aruco_detection = LaunchConfiguration("use_aruco_detection")
 
     # ------------------------------------------------------------------ #
-    # TIAGo Pro (simulation or hardware) with Linear Feedback Controller
+    # TIAGo Pro (simulation) with Linear Feedback Controller
     # ------------------------------------------------------------------ #
     tiago_robot_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
