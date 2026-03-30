@@ -1,0 +1,41 @@
+---
+# HPP orchestrator parameters for the TIAGo Pro pick-and-place demo.
+#
+# State space (nv=10): 3 base (vx, vy, omega) + 7 right arm joints
+# Config space (nq=11): 4 base (x, y, cos, sin) + 7 right arm joints
+
+# ── Trajectory sampling ───────────────────────────────────────────────────────
+trajectory:
+  dt: 0.01          # sampling period (s) — must match agimus_controller rate
+
+# ── Scene geometry ────────────────────────────────────────────────────────────
+scene:
+  table_offset_x: 0.5    # table pushed away from robot origin (m)
+  table_offset_z: -0.1   # table lowered (m)
+  box_y_init:    -0.15   # box initial y position (m)
+  box_y_goal:     0.15   # box goal y position (m)
+
+# ── Arm tuck configurations ───────────────────────────────────────────────────
+tuck:
+  left_arm:  [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+  right_arm: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+# ── MPC weights ───────────────────────────────────────────────────────────────
+# All weight vectors are in tangent space (nv=10).
+weights:
+  # Position tracking (nv=10): [base_x, base_y, base_yaw, arm_1..7]
+  w_q:    [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0]
+
+  # Velocity tracking (nv=10): increase base weights for faster base tracking
+  w_qdot: [0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1, 0.1]
+
+  # Acceleration regularization (nv=10): 0 = disabled
+  w_qddot: [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+  # Effort regularization (nv=10): higher = slower/smoother motion
+  # [base_x, base_y, base_yaw, arm_1..7]
+  w_effort: [0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001, 0.001]
+
+  # Collision avoidance (scalar)
+  w_collision: 0.0
+

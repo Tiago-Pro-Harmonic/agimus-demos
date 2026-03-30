@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<robot name="box">
+  <!-- Handle approached from the front (robot side, +x direction).
+       wxyz="0.707 0 0.707 0" = rotation +90° around Y → handle Z points in +x (toward robot).
+       The gripper approaches from x < box_x, moving in +x direction. -->
+  <handle name="handle" clearance="0.025" approaching_direction="0 0 1">
+    <position xyz="0 0 0" wxyz="0.707 0 0.707 0" />
+    <link name="base_link"/>
+  </handle>
+  <!-- Contact surface for placement on table (bottom face of the box) -->
+  <contact name="surface">
+    <link name="base_link"/>
+    <point>-0.025 -0.025 -0.025   -0.025 0.025 -0.025   0.025 0.025 -0.025   0.025 -0.025 -0.025
+    </point>
+    <shape> 4 0 1 2 3</shape>
+  </contact>
+</robot>

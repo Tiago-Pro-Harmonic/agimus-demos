@@ -1,0 +1,56 @@
+---
+# OCP definition for the TIAGo Pro pick-and-place demo.
+#
+# Pure trajectory tracking OCP:
+#   - state_reg  : tracks joint trajectory (q, v) from MpcInput
+#   - control_reg: regularises effort
+#
+# The EE pose is implicitly tracked via state_reg since HPP provides a full
+# joint trajectory (not an EE trajectory). No ResidualModelFramePlacement needed.
+#
+# State space (nv=10): 3 base (vx, vy, omega) + 7 right arm joints
+# world_frame for FK: 'universe' (Pinocchio joint 0, planar base robot)
+
+# TODO : try with corridor : ActivationModelQuadExp on state reg
+
+running_model:
+  class: IntegratedActionModelEuler
+  differential:
+    class: DifferentialActionModelFreeFwdDynamics
+    costs:
+    - name: control_reg
+      update: true
+      weight: 1.0
+      cost:
+        class: CostModelResidual
+        activation:
+          class: ActivationModelWeightedQuad
+          weights: 1.0
+        residual:
+          class: ResidualModelControl
+    - name: state_reg
+      update: true
+      weight: 1.0
+      cost:
+        class: CostModelResidual
+        activation:
+          class: ActivationModelWeightedQuad
+          weights: 1.0
+        residual:
+          class: ResidualModelState
+
+terminal_model:
+  class: IntegratedActionModelEuler
+  differential:
+    class: DifferentialActionModelFreeFwdDynamics
+    costs:
+    - name: state_reg
+      update: true
+      weight: 1.0
+      cost:
+        class: CostModelResidual
+        activation:
+          class: ActivationModelWeightedQuad
+          weights: 1.0
+        residual:
+          class: ResidualModelState
