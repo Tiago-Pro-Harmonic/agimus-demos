@@ -10,10 +10,14 @@ Usage:
         use_mpc_debugger:=true
 """
 
+import math
+import os
+
 from ament_index_python.packages import get_package_share_directory
 
 from launch import LaunchContext, LaunchDescription
 from launch.actions import (
+    AppendEnvironmentVariable,
     DeclareLaunchArgument,
     IncludeLaunchDescription,
     OpaqueFunction,
@@ -71,6 +75,29 @@ def launch_setup(
         package="agimus_demos_common",
         executable="wait_for_non_zero_joints_node",
         parameters=[get_use_sim_time()],
+        output="screen",
+    )
+
+    # ------------------------------------------------------------------ #
+    # Spawn ArUco marker visual at the EE target position
+    # Model SDF is shared from agimus_demo_04_aruco_corners (no detection here).
+    # The goal position matches goal_x/y/z in trajectory_weights_params.yaml.
+    # ------------------------------------------------------------------ #
+    aruco_model_path = os.path.join(
+        get_package_share_directory("agimus_demo_04_aruco_corners"),
+        "models", "aruco_marker_0", "model.sdf",
+    )
+    spawn_aruco_marker_node = Node(
+        package="ros_gz_sim",
+        executable="create",
+        arguments=[
+            "-name", "aruco_marker_0",
+            "-file", aruco_model_path,
+            "-x", LaunchConfiguration("marker_x"),
+            "-y", LaunchConfiguration("marker_y"),
+            "-z", LaunchConfiguration("marker_z"),
+            "-P", str(math.pi / 2),  # face pointing toward -X (toward robot at origin)
+        ],
         output="screen",
     )
 
@@ -180,6 +207,7 @@ def launch_setup(
 
     return [
         tiago_robot_launch,
+        spawn_aruco_marker_node,
         wait_for_non_zero_joints_node,
         environment_publisher_node,
         mpc_debugger,
@@ -198,8 +226,13 @@ def launch_setup(
 
 
 def generate_launch_description():
+    models_dir = os.path.join(
+        get_package_share_directory("agimus_demo_04_aruco_corners"), "models"
+    )
+
     return LaunchDescription(
         [
+            AppendEnvironmentVariable("GZ_SIM_RESOURCE_PATH", models_dir),
             DeclareLaunchArgument(
                 "use_mpc_debugger",
                 default_value="false",
@@ -217,6 +250,20 @@ def generate_launch_description():
                 default_value="True",
                 choices=["True", "False"],
                 description="Launch Gazebo GUI client.",
+            ),
+            # ArUco marker position — defaults match goal_x/y/z in
+            # trajectory_weights_params.yaml so the marker sits at the EE target.
+            DeclareLaunchArgument(
+                "marker_x", default_value="2.0",
+                description="X position of the ArUco marker in world frame (m).",
+            ),
+            DeclareLaunchArgument(
+                "marker_y", default_value="0.2",
+                description="Y position of the ArUco marker in world frame (m).",
+            ),
+            DeclareLaunchArgument(
+                "marker_z", default_value="1.0",
+                description="Z position of the ArUco marker in world frame (m).",
             ),
             OpaqueFunction(function=launch_setup),
         ]

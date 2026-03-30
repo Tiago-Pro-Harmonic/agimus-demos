@@ -29,7 +29,6 @@ from agimus_controller.trajectory import (
     WeightedTrajectoryPoint,
 )
 from agimus_controller_ros.ros_utils import (
-    get_params_from_node,
     weighted_traj_point_to_mpc_msg,
 )
 from agimus_controller_ros.simple_trajectory_publisher import TrajectoryPublisherBase
@@ -56,6 +55,7 @@ class FixedGoalPublisher(TrajectoryPublisherBase):
 
     def __init__(self):
         self._dt = None
+        self._publish_period = None
         super().__init__("fixed_goal_publisher")
 
         self._traj_weight_param_listener = trajectory_weights_params.ParamListener(self)
@@ -76,10 +76,7 @@ class FixedGoalPublisher(TrajectoryPublisherBase):
         self._goal_pitch = self.get_parameter("goal_pitch").value
         self._goal_yaw = self.get_parameter("goal_yaw").value
 
-        # Fetch MPC timestep and rate from agimus_controller_node
-        params = get_params_from_node(self, "agimus_controller_node", ["ocp.dt", "rate"])
-        self._dt = params[0].double_value
-        self._publish_period = 1.0 / params[1].double_value
+        # ocp.dt and rate are fetched asynchronously via _agimus_params_to_fetch.
 
         # The visual servoing key must match ResidualModelVisualServoing.input_key
         self._vs_key = self._traj_weight_params.ee_frame_name + "_vs"
@@ -87,16 +84,21 @@ class FixedGoalPublisher(TrajectoryPublisherBase):
         self._goal_point: WeightedTrajectoryPoint | None = None
         self._msg_id = 0
 
+    def _agimus_params_to_fetch(self) -> list:
+        return ["free_flyer", "planar_base", "ocp.dt", "rate"]
+
+    def _on_agimus_params(self, values) -> None:
+        self._free_flyer = values[0].bool_value
+        self._planar_base = values[1].bool_value
+        self._dt = values[2].double_value
+        self._publish_period = 1.0 / values[3].double_value
+
     @property
     def ee_frame_name(self) -> str:
         return self._traj_weight_params.ee_frame_name
 
     def ready_callback(self):
         """Build the constant goal trajectory point and start the timer."""
-        while self._dt is None:
-            self.get_logger().info("Waiting for agimus_controller_node params.")
-            rclpy.spin_once(self, timeout_sec=1.0)
-
         model = self.robot_models.robot_model
         nv = model.nv
 
