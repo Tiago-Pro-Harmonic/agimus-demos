@@ -429,7 +429,7 @@ class Orchestrator:
         msg.w_collision_avoidance = W_COLLISION
         return msg
 
-    def _build_messages(self) -> list:
+    def _build_messages(self, n_hold: int = 200) -> list:
         msgs = []
         idx = 0
         for name, path in [("p1 (approach)", self.p1),
@@ -440,7 +440,16 @@ class Orchestrator:
             for q, dq, ddq in zip(q_arr, dq_arr, ddq_arr):
                 msgs.append(self._build_msg(q, dq, ddq, idx))
                 idx += 1
-        print(f"  {len(msgs)} MpcInput messages total.")
+        # Append hold points at the final position (zero velocity/acceleration)
+        # so the MPC has time to converge after the trajectory ends.
+        q_final  = msgs[-1].q
+        dq_zero  = np.zeros(len(msgs[-1].qdot)).tolist()
+        ddq_zero = np.zeros(len(msgs[-1].qddot)).tolist()
+        for _ in range(n_hold):
+            msg = self._build_msg(np.array(q_final), np.array(dq_zero), np.array(ddq_zero), idx)
+            msgs.append(msg)
+            idx += 1
+        print(f"  {len(msgs)} MpcInput messages total ({n_hold} hold points appended).")
         return msgs
 
     # ── Execution ─────────────────────────────────────────────────────────────
