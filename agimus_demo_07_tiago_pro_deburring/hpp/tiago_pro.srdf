@@ -2405,6 +2405,7 @@
   <disable_collisions link1="arm_right_6_link" link2="suspension_rear_left_link" reason="Never"/>
   <disable_collisions link1="arm_right_6_link" link2="torso_arm_right_link" reason="Never"/>
   <disable_collisions link1="arm_right_6_link" link2="wheel_rear_left_link" reason="Never"/>
+  <disable_collisions link1="arm_right_6_link" link2="gripper_right_camera_link" reason="Never"/>
   <disable_collisions link1="arm_right_7_link" link2="base_rear_laser_link" reason="Never"/>
   <disable_collisions link1="arm_right_7_link" link2="gripper_right_base_link" reason="Never"/>
   <disable_collisions link1="arm_right_7_link" link2="gripper_right_fingertip_left_link" reason="Never"/>
